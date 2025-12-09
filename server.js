@@ -25,7 +25,10 @@ await connectDB();
 
 // Core middleware
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: [
+    "http://localhost:3000",                           // Local development
+    "https://medverse-frontend-mocha.vercel.app",      // Vercel production
+  ],
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
@@ -50,6 +53,7 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api/lab-tests", labTestRoutes);
 app.use("/api/medical-records", medicalRecordRoutes);
 app.use("/api/privilege-card", privilegeRoutes);
+// Doctor routes removed
 
 // Error handler last
 app.use(errorHandler);
