@@ -2,6 +2,8 @@ import express from "express";
 import { body, validationResult } from "express-validator";
 import asyncHandler from "../utils/asyncHandler.js";
 import { signupUser, loginUser } from "../controllers/authController.js";
+import { protect, admin } from "../middleware/authMiddleware.js";
+import User from "../models/User.js";
 
 const router = express.Router();
 

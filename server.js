@@ -12,6 +12,9 @@ import appointmentRoutes from "./routes/appointments.js";
 import labTestRoutes from "./routes/lab-tests.js";
 import medicalRecordRoutes from "./routes/medical-records.js";
 import privilegeRoutes from "./routes/privilegeRoutes.js";
+import adminRoutes from "./routes/admin.js";
+import doctorRoutes from "./routes/doctor.js";
+import doctorsRoutes from "./routes/doctors.js";
 
 // Middlewares
 import errorHandler from "./middleware/errorHandler.js";
@@ -53,7 +56,9 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api/lab-tests", labTestRoutes);
 app.use("/api/medical-records", medicalRecordRoutes);
 app.use("/api/privilege-card", privilegeRoutes);
-// Doctor routes removed
+app.use("/api/admin", adminRoutes);
+app.use("/api/doctor", doctorRoutes);
+app.use("/api/doctors", doctorsRoutes);
 
 // Error handler last
 app.use(errorHandler);

@@ -2,12 +2,24 @@ import express from "express";
 import auth from "../middleware/auth.js";
 import MedicalRecord from "../models/MedicalRecord.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import User from "../models/User.js";
 
 const router = express.Router();
 
 // GET /api/medical-records - get all medical records for user
 router.get("/", auth, asyncHandler(async (req, res) => {
   const records = await MedicalRecord.find({ userId: req.userId }).sort({ date: -1 });
+  res.json(records);
+}));
+
+// GET /api/medical-records/patient/:patientId - get records for a specific patient (doctor only)
+router.get("/patient/:patientId", auth, asyncHandler(async (req, res) => {
+  const user = await User.findById(req.userId);
+  if (!user || (user.role !== 'doctor' && user.role !== 'admin')) {
+    res.status(403);
+    throw new Error("Access denied. Doctors only.");
+  }
+  const records = await MedicalRecord.find({ userId: req.params.patientId }).sort({ date: -1 });
   res.json(records);
 }));
 

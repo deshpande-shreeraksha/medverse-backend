@@ -8,7 +8,8 @@ const appointmentSchema = new mongoose.Schema(
       required: true,
     },
     doctorId: {
-      type: String, // Assuming doctor IDs are not from a 'doctors' collection in this DB
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
     },
     doctorName: {

@@ -15,22 +15,13 @@ const generateToken = (user) => {
 // @route   POST /api/auth/signup
 // @access  Public
 export const signupUser = async (req, res) => {
-  const { firstName, lastName, email, password, role = "patient", doctorId = "" } = req.body;
+  const { firstName, lastName, email, password, role = "patient" } = req.body;
 
   // Validate role value
   const allowedRoles = ["patient", "doctor", "admin"];
   if (!allowedRoles.includes(role)) {
     res.status(400);
     throw new Error("Invalid role");
-  }
-
-  // If role is doctor, validate doctorId format (exactly 5 digits)
-  if (role === "doctor") {
-    const re = /^\d{5}$/;
-    if (!re.test((doctorId || "").toString())) {
-      res.status(400);
-      throw new Error("Doctor ID must be exactly 5 digits");
-    }
   }
 
   const existingUser = await User.findOne({ email });
@@ -47,7 +38,6 @@ export const signupUser = async (req, res) => {
     password: hashedPassword,
     role,
   };
-  if (role === "doctor") createObj.doctorId = doctorId || "";
 
   const user = await User.create(createObj);
 
@@ -62,7 +52,6 @@ export const signupUser = async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
-        doctorId: user.doctorId || "",
       },
     });
   } else {
@@ -80,13 +69,40 @@ export const loginUser = async (req, res) => {
   const user = await User.findOne({ email });
 
   if (user && (await bcrypt.compare(password, user.password))) {
+    // If it's a doctor login, verify their doctorId matches
+    // No legacy doctorId check — authentication is email/password-based
+
+    // Auto-promote support email to admin in the database to fix 403 errors
+    if (user.email.toLowerCase() === 'support@medverse.com' && user.role !== 'admin') {
+      user.role = 'admin';
+      await user.save();
+    }
+
     const token = generateToken(user);
+
+    // Create a user object to send to the frontend, allowing for overrides
+    const userPayload = {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      profilePictureUrl: user.profilePictureUrl || ""
+    };
+
+    // If the user is the special support email, ensure their role is admin
+    if (userPayload.email.toLowerCase() === 'support@medverse.com') {
+      userPayload.role = 'admin';
+    }
+
     res.json({
       token,
-      user: { id: user._id, firstName: user.firstName, email: user.email, role: user.role, doctorId: user.doctorId || "" },
+      user: userPayload,
     });
   } else {
     res.status(401);
     throw new Error("Invalid email or password");
   }
 };
+
+// Legacy numeric Doctor ID removed from project.

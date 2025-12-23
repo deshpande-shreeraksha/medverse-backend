@@ -4,6 +4,7 @@ import { body, query, validationResult } from "express-validator";
 import Appointment from "../models/Appointment.js";
 import auth from "../middleware/auth.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import User from "../models/User.js";
 
 const router = express.Router();
 
@@ -20,16 +21,16 @@ router.get(
     const { doctorId, date } = req.query;
     if (!date) return res.json([]);
 
-    const startOfDay = new Date(date); startOfDay.setUTCHours(0,0,0,0);
-    const endOfDay = new Date(date);   endOfDay.setUTCHours(23,59,59,999);
+    const startOfDay = new Date(date); startOfDay.setHours(0,0,0,0);
+    const endOfDay = new Date(date);   endOfDay.setHours(23,59,59,999);
 
     const appointments = await Appointment
       .find({ doctorId, startAt: { $gte: startOfDay, $lte: endOfDay }, status: { $ne: "Cancelled" } })
       .select("startAt -_id");
 
     const booked = appointments.map(a => {
-      const h = a.startAt.getUTCHours().toString().padStart(2,"0");
-      const m = a.startAt.getUTCMinutes().toString().padStart(2,"0");
+      const h = a.startAt.getHours().toString().padStart(2,"0");
+      const m = a.startAt.getMinutes().toString().padStart(2,"0");
       return `${h}:${m}`;
     });
     res.json(booked);
@@ -44,7 +45,14 @@ router.get(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const doctorId = req.userId;
+    // Find the logged-in user to get their public-facing doctorId
+    const user = await User.findById(req.userId);
+    if (!user || user.role !== 'doctor') {
+      res.status(403);
+      throw new Error("Access denied. Not a valid doctor.");
+    }
+
+    const doctorId = req.userId; // Use the user's internal _id
     const selectedDate = req.query.date ? new Date(req.query.date) : new Date();
 
     const startOfDay = new Date(selectedDate); startOfDay.setUTCHours(0,0,0,0);
@@ -69,6 +77,7 @@ router.get(
 
     const totalAppointments = await Appointment.countDocuments({ userId: req.userId });
     const appointments = await Appointment.find({ userId: req.userId })
+      .select("-doctorId")
       .sort({ startAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -98,7 +107,10 @@ router.post(
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const { doctorId, doctorName, specialization, mode, date, time } = req.body;
-    const startAt = new Date(`${date}T${time}:00.000Z`);
+    // Create date at midnight in local timezone, then add the time
+    const [hours, minutes] = time.split(':').map(Number);
+    const startAt = new Date(date);
+    startAt.setHours(hours, minutes, 0, 0);
 
     console.time("double-check");
     const existing = await Appointment.findOne({ doctorId, startAt, status: { $ne: "Cancelled" } });
@@ -109,7 +121,7 @@ router.post(
     }
 
     const appointment = await Appointment.create({
-      userId: req.userId, doctorId, doctorName, specialization, mode, startAt,
+      userId: req.userId, doctorId, doctorName, specialization, mode, startAt, status: "Scheduled",
     });
 
     res.status(201).json({ message: "Appointment booked successfully!", appointment });
@@ -123,6 +135,49 @@ router.patch("/:id/cancel", auth, asyncHandler(async (req, res) => {
     throw new Error("Appointment not found");
   }
   appointment.status = "Cancelled";
+  await appointment.save();
+  res.json({ message: "Appointment cancelled successfully", appointment });
+}));
+
+// @route   PATCH /api/appointments/:id/confirm
+// @desc    Doctor confirms an appointment
+// @access  Private (Doctor)
+router.patch("/:id/confirm", auth, asyncHandler(async (req, res) => {  
+  const doctor = await User.findById(req.userId);
+  if (!doctor || doctor.role !== 'doctor') {
+    res.status(403);
+    throw new Error("Forbidden: Only doctors can confirm appointments.");
+  }
+
+  const appointment = await Appointment.findOne({ _id: req.params.id, doctorId: req.userId });
+  if (!appointment) {
+    res.status(404);
+    throw new Error("Appointment not found or you are not the assigned doctor.");
+  }
+
+  appointment.status = "Scheduled"; // Changing from "Pending" to "Scheduled"
+  await appointment.save();
+  res.json({ message: "Appointment confirmed successfully", appointment });
+}));
+
+// @route   PATCH /api/appointments/:id/reject
+// @desc    Doctor rejects (cancels) an appointment
+// @access  Private (Doctor)
+router.patch("/:id/reject", auth, asyncHandler(async (req, res) => {
+  const doctor = await User.findById(req.userId);
+  if (!doctor || doctor.role !== 'doctor') {
+    res.status(403);
+    throw new Error("Forbidden: Only doctors can reject appointments.");
+  }
+
+  const appointment = await Appointment.findOne({ _id: req.params.id, doctorId: req.userId });
+  if (!appointment) {
+    res.status(404);
+    throw new Error("Appointment not found or you are not the assigned doctor.");
+  }
+
+  appointment.status = "Cancelled"; // Using "Cancelled" status for rejections
+  // You could add a field like `cancellationReason: 'Rejected by doctor'` to the model for more detail.
   await appointment.save();
   res.json({ message: "Appointment cancelled successfully", appointment });
 }));
