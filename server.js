@@ -15,6 +15,7 @@ import privilegeRoutes from "./routes/privilegeRoutes.js";
 import adminRoutes from "./routes/admin.js";
 import doctorRoutes from "./routes/doctor.js";
 import doctorsRoutes from "./routes/doctors.js";
+import contactRoutes from "./routes/contact.js";
 
 // Middlewares
 import errorHandler from "./middleware/errorHandler.js";
@@ -59,6 +60,7 @@ app.use("/api/privilege-card", privilegeRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/doctor", doctorRoutes);
 app.use("/api/doctors", doctorsRoutes);
+app.use("/api/contact", contactRoutes);
 
 // Error handler last
 app.use(errorHandler);

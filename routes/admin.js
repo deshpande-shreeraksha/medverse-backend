@@ -12,6 +12,13 @@ import {
   exportAppointments,
   getAudits
 } from "../controllers/adminController.js";
+import Feedback from "../models/Feedback.js";
+
+// Admin: list feedback messages
+const getFeedback = asyncHandler(async (req, res) => {
+  const feedback = await Feedback.find().sort({ createdAt: -1 });
+  res.json(feedback);
+});
 
 const router = express.Router();
 
@@ -28,5 +35,7 @@ router.patch('/appointments/:id/reschedule', protect, admin, asyncHandler(resche
 router.get('/appointments/export', protect, admin, asyncHandler(exportAppointments));
 
 router.get('/audits', protect, admin, asyncHandler(getAudits));
+// Feedback listing for admins
+router.get('/feedback', protect, admin, getFeedback);
 
 export default router;
